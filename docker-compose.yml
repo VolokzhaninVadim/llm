@@ -1,0 +1,78 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: llm
+    restart: unless-stopped
+    volumes:
+      - ./config_ollama:/root
+    environment:
+      - OLLAMA_KEEP_ALIVE=60 minutes
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_HOST=0.0.0.0
+      - LD_LIBRARY_PATH=/opt/cuda/lib64:/usr/local/cuda/lib64
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - CUDADIR=/usr/local/cuda
+      - CUDA_HOME=/usr/local/cuda
+      - FORCE_CUDA=1
+      - CUDA_VISIBLE_DEVICES=0
+      - CUDA_LAUNCH_BLOCKING=1
+    ports:
+      - "11434:11434"
+    devices:
+      - /dev/dri:/dev/dri
+      - /dev/nvidiactl:/dev/nvidiactl
+      - /dev/nvidia0:/dev/nvidia0
+    runtime: nvidia
+
+  postgres-vector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: postgres-vector
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./config_postgres:/var/lib/postgresql/data
+    env_file: .env
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+  anythingllm:
+     image: mintplexlabs/anythingllm:latest
+     container_name: anythingllm
+     restart: unless-stopped
+     ports:
+       - "3001:3001"
+     environment:
+       - STORAGE_DIR=/app/server/storage
+       - LLM_PROVIDER=ollama
+       - OLLAMA_BASE_PATH=http://ollama:11434
+       - OLLAMA_MODEL_PREF=deepseek-r1:14b
+       - OLLAMA_MODEL_TOKEN_LIMIT=4096
+       - EMBEDDING_ENGINE=ollama
+       - EMBEDDING_BASE_PATH=http://ollama:11434
+       - EMBEDDING_MODEL_PREF=bge-m3:latest
+       - EMBEDDING_MODEL_MAX_CHUNK_LENGTH=8192
+       - JWT_SECRET=${JWT_SECRET}
+       # Аудио функции
+       - WHISPER_PROVIDER=local
+       - TTS_PROVIDER=native
+       # Векторная база данных - PostgreSQL с pgvector
+       - VECTOR_DB=pgvector
+       - PGVECTOR_CONNECTION_STRING=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-vector:${POSTGRES_PORT}/${POSTGRES_DB}
+       - PGVECTOR_TABLE_NAME=vector_embeddings
+       - PGVECTOR_EMBEDDING_DIMENSION=1536
+       # Дополнительные настройки PostgreSQL
+       - PGVECTOR_SSL=false
+       - PGVECTOR_SCHEMA=public
+     env_file: .env
+     volumes:
+       - ./config_anythingllm:/app/server/storage
+     depends_on:
+       - ollama
+       - postgres-vector
