@@ -9,6 +9,9 @@ services:
       - OLLAMA_KEEP_ALIVE=60 minutes
       - OLLAMA_FLASH_ATTENTION=1
       - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_GPU_LAYERS=999
+      - OLLAMA_BATCH_SIZE=1024
+      - OLLAMA_NUM_THREADS=4
       - LD_LIBRARY_PATH=/opt/cuda/lib64:/usr/local/cuda/lib64
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
@@ -16,11 +19,6 @@ services:
       - CUDA_HOME=/usr/local/cuda
       - FORCE_CUDA=1
       - CUDA_VISIBLE_DEVICES=0
-      - CUDA_LAUNCH_BLOCKING=1
     ports:
       - "11434:11434"
-    devices:
-      - /dev/dri:/dev/dri
-      - /dev/nvidiactl:/dev/nvidiactl
-      - /dev/nvidia0:/dev/nvidia0
     runtime: nvidia
